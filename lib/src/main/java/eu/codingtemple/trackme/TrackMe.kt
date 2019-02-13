@@ -3,6 +3,8 @@ package eu.codingtemple.trackme
 import android.content.Context
 import io.reactivex.Observable
 import io.reactivex.disposables.Disposable
+import io.reactivex.functions.Action
+import io.reactivex.functions.Consumer
 import io.reactivex.schedulers.Schedulers
 import java.util.*
 
@@ -11,11 +13,24 @@ class TrackMe private constructor(builder: Builder) {
     private var disposable: Disposable? = null
     private val scheduler = Schedulers.io()
 
+    private val errorConsumer = Consumer<Throwable> {
+        sinkListener?.onError(it)
+
+        if (!silentCrashing) {
+            throw it
+        }
+    }
+    private val completeAction = Action {
+        sinkListener?.onAllSinksStarted()
+    }
+
     private val sinks = mutableMapOf<Hashable, Sink>()
     private val overrideConsent: Boolean
     private val overrideValue: Boolean
     private val silentCrashing: Boolean
     private val sinkListener: SinkStateListener?
+    private var blocking: Boolean
+
 
     init {
         for (sink in builder.sinks) {
@@ -25,31 +40,32 @@ class TrackMe private constructor(builder: Builder) {
         this.overrideValue = builder.overrideValue
         this.silentCrashing = builder.silentCrashing
         this.sinkListener = builder.sinkListener
+        this.blocking = builder.blocking
     }
 
 
     fun start(context: Context) {
-        disposable = Observable.fromArray(sinks.values)
-            .flatMapIterable { it }
-            .observeOn(scheduler)
-            .subscribe({
-                if (it.consent) {
-                    it.start(context)
-                }
-            }, {
-                sinkListener?.onError(it)
+        val observable = Observable.fromArray(sinks.values).flatMapIterable { it }
 
-                if (!silentCrashing) {
-                    throw it
-                }
-            }, {
-                sinkListener?.onAllSinksStarted()
-            })
-
-        for (sink in sinks.values) {
-            if (sink.consent) {
-                sink.start(context)
-            }
+        if (blocking) {
+            observable.blockingSubscribe(
+                Consumer {
+                    if (it.consent) {
+                        it.start(context)
+                        sinkListener?.onSinkStarted(it.id)
+                    }
+                }, errorConsumer, completeAction
+            )
+        } else {
+            disposable = observable.observeOn(scheduler)
+                .subscribe(
+                    Consumer {
+                        if (it.consent) {
+                            it.start(context)
+                            sinkListener?.onSinkStarted(it.id)
+                        }
+                    }, errorConsumer, completeAction
+                )
         }
     }
 
@@ -59,6 +75,7 @@ class TrackMe private constructor(builder: Builder) {
         internal var overrideValue: Boolean = false
         internal var silentCrashing = true
         internal var sinkListener: SinkStateListener? = null
+        internal var blocking: Boolean = false
 
         fun withSink(sink: Sink): Builder {
             sinks.add(sink)
@@ -73,6 +90,11 @@ class TrackMe private constructor(builder: Builder) {
 
         fun withSilentCrashing(silentCrashing: Boolean): Builder {
             this.silentCrashing = silentCrashing
+            return this
+        }
+
+        fun withBlocking(blocking: Boolean): Builder {
+            this.blocking = blocking
             return this
         }
 
