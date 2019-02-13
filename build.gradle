@@ -1,0 +1,76 @@
+buildscript {
+    ext.kotlin_version = '1.3.20'
+    repositories {
+        jcenter()
+        google()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:3.3.1'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+ext {
+    minSdkVersion = 16
+    targetSdkVersion = 27
+    compileSdkVersion = 28
+    buildToolsVersion = '28.0.3'
+
+    deps = [:]
+
+    deps.versions = [
+            support: '28.0.0'
+    ]
+
+    deps.app = [
+            support: [
+                    appcompat  : "com.android.support:appcompat-v7:${deps.versions.support}",
+                    annotations: "com.android.support:support-annotations:${deps.versions.support}"
+            ]
+    ]
+
+    deps.test = [
+            junit: 'junit:junit:4.12'
+    ]
+}
+
+allprojects {
+    repositories {
+        google()
+        jcenter()
+    }
+}
+
+subprojects { subproject ->
+    plugins.whenPluginAdded { plugin ->
+        def isAppPlugin = (plugin.class.name == 'com.android.build.gradle.AppPlugin')
+        def isLibraryPlugin = (plugin.class.name == 'com.android.build.gradle.LibraryPlugin')
+        def isTestPlugin = (plugin.class.name == 'com.android.build.gradle.TestPlugin')
+
+        def isAndroidPlugin = isAppPlugin || isLibraryPlugin || isTestPlugin
+
+        if (isAndroidPlugin) {
+            subproject.apply plugin: 'kotlin-android-extensions'
+            subproject.apply plugin: 'kotlin-android'
+
+            android {
+                androidExtensions {
+                    experimental = true
+                }
+
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_1_8
+                    targetCompatibility JavaVersion.VERSION_1_8
+                }
+            }
+
+            dependencies {
+                implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+            }
+        }
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
