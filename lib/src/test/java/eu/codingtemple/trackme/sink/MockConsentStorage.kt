@@ -1,4 +1,4 @@
-package eu.codingtemple.trackme
+package eu.codingtemple.trackme.sink
 
 import java.util.*
 

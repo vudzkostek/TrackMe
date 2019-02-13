@@ -1,4 +1,4 @@
-package eu.codingtemple.trackme
+package eu.codingtemple.trackme.sink
 
 abstract class Hashable {
     abstract fun eq(o: Any?): Boolean

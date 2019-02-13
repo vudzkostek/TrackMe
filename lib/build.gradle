@@ -14,10 +14,10 @@ android {
 
 dependencies {
     implementation deps.app.support.annotations
-    implementation deps.app.rxjava
     implementation deps.app.rxandroid
+    implementation deps.app.rxkotlin
     testImplementation deps.test.junit
-    testImplementation deps.test.mockito
+    testImplementation deps.test.mockito_kotlin
     testImplementation deps.test.assertj
 }
 

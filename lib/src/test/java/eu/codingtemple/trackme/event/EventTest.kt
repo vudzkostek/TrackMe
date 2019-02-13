@@ -1,5 +1,6 @@
-package eu.codingtemple.trackme
+package eu.codingtemple.trackme.event
 
+import eu.codingtemple.trackme.event.Event
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 

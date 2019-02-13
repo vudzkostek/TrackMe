@@ -1,4 +1,4 @@
-package eu.codingtemple.trackme
+package eu.codingtemple.trackme.event
 
 open class Event(val eventId: String) {
     private val attributes = mutableMapOf<String, String>()

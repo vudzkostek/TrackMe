@@ -1,9 +1,9 @@
-package eu.codingtemple.trackme
+package eu.codingtemple.trackme.sink
 
 class StringSinkId(private val id: String) : Hashable() {
 
     override fun eq(other: Any?): Boolean {
-        return id == other
+        return id == if (other is StringSinkId) other.id else null
     }
 
     override fun hash(): Int {

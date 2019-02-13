@@ -1,4 +1,4 @@
-package eu.codingtemple.trackme
+package eu.codingtemple.trackme.sink
 
 abstract class SharedStorageSink<T : ConsentStorage> : Sink {
     internal abstract val storage: T

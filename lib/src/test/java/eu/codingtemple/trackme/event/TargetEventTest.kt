@@ -1,5 +1,7 @@
-package eu.codingtemple.trackme
+package eu.codingtemple.trackme.event
 
+import eu.codingtemple.trackme.event.TargetEvent
+import eu.codingtemple.trackme.sink.StringSinkId
 import org.assertj.core.api.Assertions
 import org.junit.Test
 
