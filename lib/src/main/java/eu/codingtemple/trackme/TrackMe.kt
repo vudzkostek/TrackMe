@@ -20,8 +20,8 @@ class TrackMe private constructor(builder: Builder) {
             throw it
         }
     }
-    private val completeAction = Action {
-        sinkListener?.onAllSinksStarted()
+    private val completeInitializeAction = Action {
+        sinkListener?.onAllSinksInitialized()
     }
 
     private val sinks = mutableListOf<Sink>()
@@ -42,6 +42,7 @@ class TrackMe private constructor(builder: Builder) {
     }
 
     fun log(targetEvent: TargetEvent) {
+        // TODO thread
         sinks.forEach {
             if (targetEvent.getTargetSinks().contains(it.id)) {
                 it.log(targetEvent)
@@ -49,32 +50,59 @@ class TrackMe private constructor(builder: Builder) {
         }
     }
 
-    fun start(context: Context) {
+    fun initialize(context: Context) {
+        sinks.forEach { it.initialize(context) }
+
         val observable = Observable.fromArray(sinks).flatMapIterable { it }
 
         if (blocking) {
             observable.blockingSubscribe(
                 Consumer {
                     if (it.consent) {
-                        it.start(context)
-                        sinkListener?.onSinkStarted(it.id)
+                        it.initialize(context)
+                        sinkListener?.onSinkInitialized(it.id)
                     }
-                }, errorConsumer, completeAction
+                }, errorConsumer, completeInitializeAction
             )
         } else {
             disposable = observable.observeOn(scheduler)
                 .subscribe(
                     Consumer {
                         if (it.consent) {
-                            it.start(context)
-                            sinkListener?.onSinkStarted(it.id)
+                            it.initialize(context)
+                            sinkListener?.onSinkInitialized(it.id)
                         }
-                    }, errorConsumer, completeAction
+                    }, errorConsumer, completeInitializeAction
                 )
         }
     }
 
-    fun setConsentTrue(sinkIds: List<Hashable>, context: Context) {
+    fun start() {
+        val observable = Observable.fromArray(sinks).flatMapIterable { it }
+
+        if (blocking) {
+            observable.blockingSubscribe(
+                Consumer {
+                    if (it.consent) {
+                        it.start()
+                        sinkListener?.onSinkStarted(it.id)
+                    }
+                }, errorConsumer
+            )
+        } else {
+            disposable = observable.observeOn(scheduler)
+                .subscribe(
+                    Consumer {
+                        if (it.consent) {
+                            it.start()
+                            sinkListener?.onSinkStarted(it.id)
+                        }
+                    }, errorConsumer
+                )
+        }
+    }
+
+    fun setConsentTrue(sinkIds: List<Hashable>) {
         val observable = Observable.fromArray(sinks).flatMapIterable { it }
 
         if (blocking) {
@@ -85,11 +113,11 @@ class TrackMe private constructor(builder: Builder) {
                         it.consent = true
 
                         if (!consentOld) {
-                            it.start(context)
+                            it.start()
                             sinkListener?.onSinkStarted(it.id)
                         }
                     }
-                }, errorConsumer, completeAction
+                }, errorConsumer
             )
         } else {
             disposable = observable.observeOn(scheduler)
@@ -100,17 +128,17 @@ class TrackMe private constructor(builder: Builder) {
                             it.consent = true
 
                             if (!consentOld) {
-                                it.start(context)
+                                it.start()
                                 sinkListener?.onSinkStarted(it.id)
                             }
                         }
-                    }, errorConsumer, completeAction
+                    }, errorConsumer
                 )
         }
     }
 
-    fun setConsentTrue(sinkId: Hashable, context: Context) {
-        setConsentTrue(listOf(sinkId), context)
+    fun setConsentTrue(sinkId: Hashable) {
+        setConsentTrue(listOf(sinkId))
     }
 
     fun setConsentFalse(sinkIds: List<Hashable>) {
@@ -121,6 +149,7 @@ class TrackMe private constructor(builder: Builder) {
 
                 if (consentOld) {
                     it.finish()
+                    sinkListener?.onSinkFinished(it.id)
                 }
             }
         }

@@ -7,9 +7,11 @@ interface Sink {
 
     var consent: Boolean
 
-    fun log(event: Event): String
+    fun initialize(context: Context)
 
-    fun start(context: Context)
+    fun log(event: Event)
+
+    fun start()
 
     fun finish()
 }
