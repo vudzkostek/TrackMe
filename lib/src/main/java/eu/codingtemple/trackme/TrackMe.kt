@@ -43,7 +43,6 @@ class TrackMe private constructor(builder: Builder) {
         this.blocking = builder.blocking
     }
 
-
     fun start(context: Context) {
         val observable = Observable.fromArray(sinks.values).flatMapIterable { it }
 
@@ -67,6 +66,60 @@ class TrackMe private constructor(builder: Builder) {
                     }, errorConsumer, completeAction
                 )
         }
+    }
+
+    fun setConsentTrue(sinkIds: List<Hashable>, context: Context) {
+        val observable = Observable.fromArray(sinks.values).flatMapIterable { it }
+
+        if (blocking) {
+            observable.blockingSubscribe(
+                Consumer {
+                    if(sinkIds.contains(it.id)) {
+                        val consentOld = it.consent
+                        it.consent = true
+
+                        if (!consentOld) {
+                            it.start(context)
+                            sinkListener?.onSinkStarted(it.id)
+                        }
+                    }
+                }, errorConsumer, completeAction
+            )
+        } else {
+            disposable = observable.observeOn(scheduler)
+                .subscribe(
+                    Consumer {
+                        if(sinkIds.contains(it.id)) {
+                            val consentOld = it.consent
+                            it.consent = true
+
+                            if (!consentOld) {
+                                it.start(context)
+                                sinkListener?.onSinkStarted(it.id)
+                            }
+                        }
+                    }, errorConsumer, completeAction
+                )
+        }
+    }
+
+    fun setConsentTrue(sinkId: Hashable, context: Context) {
+        setConsentTrue(listOf(sinkId), context)
+    }
+
+    fun setConsentFalse(sinkId: Hashable) {
+        val sink = sinks[sinkId] ?: throw RuntimeException("Sink $sinkId was not added to TrackMe")
+
+        val consentOld = sink.consent
+        sink.consent = false
+
+        if (consentOld) {
+            sink.finish()
+        }
+    }
+
+    fun finishAll() {
+        sinks.values.forEach { it.finish() }
     }
 
     inner class Builder {
