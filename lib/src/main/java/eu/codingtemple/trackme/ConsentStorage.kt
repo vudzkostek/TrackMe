@@ -1,7 +1,7 @@
 package eu.codingtemple.trackme
 
 interface ConsentStorage {
-    fun setConsent(sinkId: String, consent: Boolean)
+    fun setConsent(sinkId: Hashable, consent: Boolean)
 
-    fun getConsent(sinkId: String): Boolean
+    fun getConsent(sinkId: Hashable): Boolean
 }

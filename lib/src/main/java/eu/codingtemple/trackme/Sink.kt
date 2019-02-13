@@ -3,7 +3,7 @@ package eu.codingtemple.trackme
 import android.content.Context
 
 interface Sink {
-    val id: String
+    val id: Hashable
 
     var consent: Boolean
 
