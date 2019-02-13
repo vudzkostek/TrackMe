@@ -7,7 +7,7 @@ interface SinkStateListener {
 
     fun onSinkFinished(sinkId: Hashable)
 
-    fun onAllSinksStarted(sinks: List<Hashable>)
+    fun onAllSinksStarted()
 
-    fun onSinkStartError(throwable: Throwable)
+    fun onError(throwable: Throwable)
 }

@@ -1,9 +1,15 @@
 package eu.codingtemple.trackme
 
 import android.content.Context
+import io.reactivex.Observable
+import io.reactivex.disposables.Disposable
+import io.reactivex.schedulers.Schedulers
 import java.util.*
 
 class TrackMe private constructor(builder: Builder) {
+
+    private var disposable: Disposable? = null
+    private val scheduler = Schedulers.io()
 
     private val sinks = mutableMapOf<Hashable, Sink>()
     private val overrideConsent: Boolean
@@ -21,7 +27,25 @@ class TrackMe private constructor(builder: Builder) {
         this.sinkListener = builder.sinkListener
     }
 
+
     fun start(context: Context) {
+        disposable = Observable.fromArray(sinks.values)
+            .flatMapIterable { it }
+            .observeOn(scheduler)
+            .subscribe({
+                if (it.consent) {
+                    it.start(context)
+                }
+            }, {
+                sinkListener?.onError(it)
+
+                if (!silentCrashing) {
+                    throw it
+                }
+            }, {
+                sinkListener?.onAllSinksStarted()
+            })
+
         for (sink in sinks.values) {
             if (sink.consent) {
                 sink.start(context)
