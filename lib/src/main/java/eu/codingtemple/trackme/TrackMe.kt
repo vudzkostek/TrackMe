@@ -1,10 +1,11 @@
 package eu.codingtemple.trackme
 
+import android.content.Context
 import java.util.*
 
 class TrackMe private constructor(builder: Builder) {
 
-    private val sinks = HashMap<Hashable, Sink>()
+    private val sinks = mutableMapOf<Hashable, Sink>()
     private val overrideConsent: Boolean
     private val overrideValue: Boolean
     private val silentCrashing: Boolean
@@ -18,6 +19,14 @@ class TrackMe private constructor(builder: Builder) {
         this.overrideValue = builder.overrideValue
         this.silentCrashing = builder.silentCrashing
         this.sinkListener = builder.sinkListener
+    }
+
+    fun start(context: Context) {
+        for (sink in sinks.values) {
+            if (sink.consent) {
+                sink.start(context)
+            }
+        }
     }
 
     inner class Builder {
