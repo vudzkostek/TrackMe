@@ -1,6 +1,6 @@
 package eu.codingtemple.trackme
 
-interface OnSinkStateListener {
+interface SinkStateListener {
     fun onSinkCreated(sinkId: Hashable)
 
     fun onSinkStarted(sinkId: Hashable)
