@@ -24,7 +24,7 @@ class TrackMe private constructor(builder: Builder) {
         sinkListener?.onAllSinksStarted()
     }
 
-    private val sinks = mutableMapOf<Hashable, Sink>()
+    private val sinks = mutableListOf<Sink>()
     private val overrideConsent: Boolean
     private val overrideValue: Boolean
     private val silentCrashing: Boolean
@@ -33,9 +33,7 @@ class TrackMe private constructor(builder: Builder) {
 
 
     init {
-        for (sink in builder.sinks) {
-            sinks[sink.id] = sink
-        }
+        this.sinks.addAll(builder.sinks)
         this.overrideConsent = builder.overrideConsent
         this.overrideValue = builder.overrideValue
         this.silentCrashing = builder.silentCrashing
@@ -43,8 +41,16 @@ class TrackMe private constructor(builder: Builder) {
         this.blocking = builder.blocking
     }
 
+    fun log(targetEvent: TargetEvent) {
+        sinks.forEach {
+            if (targetEvent.getTargetSinks().contains(it.id)) {
+                it.log(targetEvent)
+            }
+        }
+    }
+
     fun start(context: Context) {
-        val observable = Observable.fromArray(sinks.values).flatMapIterable { it }
+        val observable = Observable.fromArray(sinks).flatMapIterable { it }
 
         if (blocking) {
             observable.blockingSubscribe(
@@ -69,12 +75,12 @@ class TrackMe private constructor(builder: Builder) {
     }
 
     fun setConsentTrue(sinkIds: List<Hashable>, context: Context) {
-        val observable = Observable.fromArray(sinks.values).flatMapIterable { it }
+        val observable = Observable.fromArray(sinks).flatMapIterable { it }
 
         if (blocking) {
             observable.blockingSubscribe(
                 Consumer {
-                    if(sinkIds.contains(it.id)) {
+                    if (sinkIds.contains(it.id)) {
                         val consentOld = it.consent
                         it.consent = true
 
@@ -89,7 +95,7 @@ class TrackMe private constructor(builder: Builder) {
             disposable = observable.observeOn(scheduler)
                 .subscribe(
                     Consumer {
-                        if(sinkIds.contains(it.id)) {
+                        if (sinkIds.contains(it.id)) {
                             val consentOld = it.consent
                             it.consent = true
 
@@ -107,19 +113,25 @@ class TrackMe private constructor(builder: Builder) {
         setConsentTrue(listOf(sinkId), context)
     }
 
-    fun setConsentFalse(sinkId: Hashable) {
-        val sink = sinks[sinkId] ?: throw RuntimeException("Sink $sinkId was not added to TrackMe")
+    fun setConsentFalse(sinkIds: List<Hashable>) {
+        sinks.forEach {
+            if (sinkIds.contains(it.id)) {
+                val consentOld = it.consent
+                it.consent = false
 
-        val consentOld = sink.consent
-        sink.consent = false
-
-        if (consentOld) {
-            sink.finish()
+                if (consentOld) {
+                    it.finish()
+                }
+            }
         }
     }
 
+    fun setConsentFalse(sinkId: Hashable) {
+        setConsentFalse(listOf(sinkId))
+    }
+
     fun finishAll() {
-        sinks.values.forEach { it.finish() }
+        sinks.forEach { it.finish() }
     }
 
     inner class Builder {
