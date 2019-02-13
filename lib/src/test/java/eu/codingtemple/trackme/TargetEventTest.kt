@@ -1,15 +1,14 @@
 package eu.codingtemple.trackme
 
+import org.assertj.core.api.Assertions
 import org.junit.Test
-
-import org.junit.Assert.assertEquals
 
 class TargetEventTest {
     @Test
     fun builderCorrect() {
         // given
         val eventId = "eventId"
-        val sinkId = "sinkId"
+        val sinkId = StringSinkId("sinkId")
         val key = "key1"
         val value = "value1"
 
@@ -17,9 +16,9 @@ class TargetEventTest {
         val event = TargetEvent.Builder(eventId).attribute(key, value).sink(sinkId).build()
 
         // then
-        assertEquals(eventId, event.eventId)
-        assertEquals(value, event.getAttributes()[key])
-        assertEquals(1, event.getTargetSinks().size)
-        assertEquals(sinkId, event.getTargetSinks()[0])
+        Assertions.assertThat(event.eventId).isEqualTo(eventId)
+        Assertions.assertThat(event.getAttributes()[key]).isEqualTo(value)
+        Assertions.assertThat(event.getTargetSinks()).hasSize(1)
+        Assertions.assertThat(event.getTargetSinks()[0].string()).isEqualTo(sinkId.string())
     }
 }

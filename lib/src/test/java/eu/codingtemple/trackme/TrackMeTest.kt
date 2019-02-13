@@ -1,10 +1,10 @@
 package eu.codingtemple.trackme
 
-import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions
 import org.junit.Test
 
+class TrackMeTest {
 
-class EventTest {
     @Test
     fun builderCorrect() {
         // given
@@ -16,7 +16,7 @@ class EventTest {
         val event = Event.Builder(eventId).attribute(key, value).build()
 
         // then
-        assertThat(event.eventId).isEqualTo(eventId)
-        assertThat(event.getAttributes()[key]).isEqualTo(value)
+        Assertions.assertThat(event.eventId).isEqualTo(eventId)
+        Assertions.assertThat(event.getAttributes()[key]).isEqualTo(value)
     }
 }

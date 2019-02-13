@@ -17,6 +17,8 @@ dependencies {
     implementation deps.app.rxjava
     implementation deps.app.rxandroid
     testImplementation deps.test.junit
+    testImplementation deps.test.mockito
+    testImplementation deps.test.assertj
 }
 
 repositories {
