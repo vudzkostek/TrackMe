@@ -1,5 +1,5 @@
 # TrackMe
-TrackMe allows you to manage all your tracking services.
+TrackMe allows you to manage all your tracking services. It is a simple, lighweight library.
 
 Nowadays we use different tools for gathering data about crashes, ui experience, incomes etc. Each and every tool has to be managed separately and in order to send events to multiple tools we need to either add couple of lines in desired place or, like in most cases, we create some uber singleton for managing all these tools and sending events. TrackMe is a library that will help you manage your tracking tools.
 
@@ -15,6 +15,56 @@ implementation "TODO:trackme:x.y.z"
 
 (Please replace `x` and `y` with the latest version numbers: [![Maven Central](https://maven-badges.herokuapp.com/maven-central/TODO.trackme/trackme/badge.svg)](https://maven-badges.herokuapp.com/maven-central/TODO.trackme/trackme)
 )
+
+### Initializing TrackMe
+
+Track me is not kept as a single instance. If you want to share same instance between all of your classes you should implement your own singleton provider.
+
+```java
+import android.app.Application;
+import eu.codingtemple.trackme.sink.ConsentStorage;
+import eu.codingtemple.trackme.sink.Hashable;
+import org.jetbrains.annotations.NotNull;
+
+public class MainApplication extends Application {
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+
+        ConsentStorage storage = new SampleStorage();
+        SampleSink sink1 = new SampleSink();
+        SampleSharedStorageSink sink2 = new SampleSharedStorageSink(storage);
+
+        SinkStateListener listener = new SinkStateListener() {...};
+
+        TrackMe trackMe = new TrackMe.Builder()
+                .withBlocking(false) // True makes all track me calls synchronious
+                .withConsentOverride(false, false) // You can override all consents with this
+                .withSinkListener(listener) // Listen for all sinks state changes
+                .withSink(sink1) // you can add as many sinks as needed, just remember to use unique ids
+                .withSink(sink2)
+                .build();
+    }
+}
+```
+
+### Loging events
+
+Events in TrackMe require id and declararion of all sinks that there are supposed to be sent to. Additionally user is able to add some custom attributes to every event.
+
+```java
+   TargetEvent event = new TargetEvent.Builder("testEventId") // event Id
+                .attribute("someCustomAttributeKey", "value") // custom value
+                .sink(sink1.getId()) // Use sink unique id
+                .build();
+                
+   ...
+   
+   trackMe.log(event);
+```
+
+Above sample will send event only to ```sink1```, other sinks will not receive it.
 
 ### Creating a sink
 
