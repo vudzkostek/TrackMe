@@ -16,10 +16,6 @@ class TrackMe private constructor(builder: Builder) {
     private val scheduler: Scheduler
     private var disposable: Disposable? = null
 
-    private val errorConsumer = Consumer<Throwable> {
-        sinkListener?.onError(it)
-    }
-
     val sinks = mutableListOf<Sink>()
     val overrideConsent: Boolean
     val overrideValue: Boolean
