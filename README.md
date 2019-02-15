@@ -49,6 +49,28 @@ public class MainApplication extends Application {
 }
 ```
 
+After creating TrackMe instance we need to initialize it and start tracking process
+
+```java
+    @Override
+    public void onCreate() {
+        ...
+        trackMe.initialize(this);
+        trackMe.start();
+    }
+```
+
+### Consent
+
+Each Sink keeps his own user consent for tracking. It's up to you if this is a shared consent between all sinks, or dedicated consent for each tool.
+
+```java
+        trackMe.setConsentTrue(Arrays.asList(sink1.getId(), sink2.getId()));
+        // or
+        trackMe.setConsentTrue(sink1.getId());
+```
+
+
 ### Loging events
 
 Events in TrackMe require id and declararion of all sinks that there are supposed to be sent to. Additionally user is able to add some custom attributes to every event.
