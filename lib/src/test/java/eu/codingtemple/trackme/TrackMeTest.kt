@@ -46,6 +46,7 @@ class TrackMeTest {
     private val initSuccessConsumer: Consumer<Pair<Hashable, Boolean>> = Consumer { sink3.initialize(context) }
     private val startSuccessConsumer: Consumer<Pair<Hashable, Boolean>> = Consumer { sink3.start() }
     private val finishSuccessConsumer: Consumer<Pair<Hashable, Boolean>> = Consumer { sink3.finish() }
+    private val logSuccessConsumer: Consumer<Pair<Hashable, Boolean>> = Consumer { sink3.log(mock()) }
 
     private lateinit var trackMeSync: TrackMe
     private lateinit var trackMeAsync: TrackMe
@@ -79,7 +80,6 @@ class TrackMeTest {
     fun shouldBuildTrackMeWithAllParams() {
         // given
         val blocking = true
-        val silentCrashing = false
         val consentOverride = true
         val overrideValue = true
 
@@ -87,7 +87,6 @@ class TrackMeTest {
         val trackMeBuilt = TrackMe.Builder()
             .withBlocking(blocking)
             .withSinkListener(sinkListener)
-            .withSilentCrashing(silentCrashing)
             .withConsentOverride(consentOverride, overrideValue)
             .withSink(sink1)
             .withSink(sink2)
@@ -95,7 +94,6 @@ class TrackMeTest {
 
         // then
         assertThat(trackMeBuilt.blocking).isEqualTo(blocking)
-        assertThat(trackMeBuilt.silentCrashing).isEqualTo(silentCrashing)
         assertThat(trackMeBuilt.overrideConsent).isEqualTo(consentOverride)
         assertThat(trackMeBuilt.overrideValue).isEqualTo(overrideValue)
         assertThat(trackMeBuilt.sinks).hasSize(2)
@@ -445,12 +443,14 @@ class TrackMeTest {
     // Log event to all, blocking
 
     @Test
-    fun shouldLogEventInBlockingMode() {
+    fun shouldLogEvent() {
         // given
         given(sink1.isInitialized()).willReturn(true)
         given(sink1.consent).willReturn(true)
         given(sink2.isInitialized()).willReturn(true)
         given(sink2.consent).willReturn(true)
+        whenever(sink1.log(any())).then { single(sink1.id, logSuccessConsumer) }
+        whenever(sink2.log(any())).then { single(sink2.id, logSuccessConsumer) }
         val eventId = "id"
         val event = TargetEvent.Builder(eventId).sink(sink1Id).sink(sink2Id).build()
 
@@ -458,23 +458,62 @@ class TrackMeTest {
         trackMeSync.log(event)
 
         // then
-        verify(sink1).id
+        verify(sink1, times(2)).id
         verify(sink1).log(eq(event as Event))
-        verify(sink2).id
+        verify(sink2, times(2)).id
         verify(sink2).log(eq(event as Event))
+        verify(sink3, times(2)).log(any())
     }
 
     // Log event to all, in threads
 
-    // Log event to one
-
     @Test
-    fun shouldLogEventInBlockingModeToOneSink() {
+    fun shouldLogEventAsync() {
         // given
         given(sink1.isInitialized()).willReturn(true)
         given(sink1.consent).willReturn(true)
         given(sink2.isInitialized()).willReturn(true)
         given(sink2.consent).willReturn(true)
+        whenever(sink1.log(any())).then { delayedSingle(5, sink1.id, logSuccessConsumer) }
+        whenever(sink2.log(any())).then { delayedSingle(5, sink2.id, logSuccessConsumer) }
+        val eventId = "id"
+        val event = TargetEvent.Builder(eventId).sink(sink1Id).sink(sink2Id).build()
+
+        // when
+        trackMeAsync.log(event)
+
+        // then
+        verify(sink1).log(eq(event as Event))
+        verify(sink2).log(eq(event as Event))
+        verifyZeroInteractions(sink3)
+        verifyZeroInteractions(sinkListener)
+
+        // when
+        schedulerRule.testScheduler.advanceTimeBy(3, TimeUnit.SECONDS)
+
+        // then
+        verifyZeroInteractions(sink3)
+        verifyZeroInteractions(sinkListener)
+
+        // when
+        schedulerRule.testScheduler.advanceTimeBy(3, TimeUnit.SECONDS)
+
+        // then
+        verify(sink3, times(2)).log(any())
+        verifyZeroInteractions(sinkListener)
+    }
+
+    // Log event to one
+
+    @Test
+    fun shouldLogEventToOneSink() {
+        // given
+        given(sink1.isInitialized()).willReturn(true)
+        given(sink1.consent).willReturn(true)
+        given(sink2.isInitialized()).willReturn(true)
+        given(sink2.consent).willReturn(true)
+        whenever(sink1.log(any())).then { single(sink1.id, logSuccessConsumer) }
+        whenever(sink2.log(any())).then { single(sink2.id, logSuccessConsumer) }
         val eventId = "id"
         val event = TargetEvent.Builder(eventId).sink(sink1Id).build()
 
@@ -482,21 +521,61 @@ class TrackMeTest {
         trackMeSync.log(event)
 
         // then
-        verify(sink1).id
+        verify(sink1, times(2)).id
         verify(sink1).log(eq(event as Event))
         verify(sink2).id
         verify(sink2, times(0)).log(any())
+        verify(sink3).log(any())
     }
 
     // Log event to one, in threads
 
+    @Test
+    fun shouldLogEventAsyncToOneSink() {
+        // given
+        given(sink1.isInitialized()).willReturn(true)
+        given(sink1.consent).willReturn(true)
+        given(sink2.isInitialized()).willReturn(true)
+        given(sink2.consent).willReturn(true)
+        whenever(sink1.log(any())).then { delayedSingle(5, sink1.id, logSuccessConsumer) }
+        whenever(sink2.log(any())).then { delayedSingle(5, sink2.id, logSuccessConsumer) }
+        val eventId = "id"
+        val event = TargetEvent.Builder(eventId).sink(sink1Id).build()
+
+        // when
+        trackMeAsync.log(event)
+
+        // then
+        verify(sink1).log(eq(event as Event))
+        verify(sink2, times(0)).log(any())
+        verifyZeroInteractions(sink3)
+        verifyZeroInteractions(sinkListener)
+
+        // when
+        schedulerRule.testScheduler.advanceTimeBy(3, TimeUnit.SECONDS)
+
+        // then
+        verify(sink2, times(0)).log(any())
+        verifyZeroInteractions(sink3)
+        verifyZeroInteractions(sinkListener)
+
+        // when
+        schedulerRule.testScheduler.advanceTimeBy(3, TimeUnit.SECONDS)
+
+        // then
+        verify(sink2, times(0)).log(any())
+        verify(sink3).log(any())
+        verifyZeroInteractions(sinkListener)
+    }
+
     // Not log if no consent
 
     @Test
-    fun shouldNotLogEventInBlockingModeIfNoConsent() {
+    fun shouldNotLogEventIfNoConsent() {
         // given
         given(sink1.isInitialized()).willReturn(true)
         given(sink1.consent).willReturn(false)
+        whenever(sink1.log(any())).then { single(sink1.id, logSuccessConsumer) }
         val eventId = "id"
         val event = TargetEvent.Builder(eventId).sink(sink1Id).build()
 
@@ -506,17 +585,53 @@ class TrackMeTest {
         // then
         verify(sink1).id
         verify(sink1, times(0)).log(eq(event as Event))
+        verify(sink3, times(0)).log(eq(event as Event))
     }
 
     // Not log if no consent, in threads
 
-    // Not log if not initialized
-
     @Test
-    fun shouldNotLogEventInBlockingModeIfSinkNotInitialized() {
+    fun shouldNotLogEventAsyncIfNoConsent() {
         // given
         given(sink1.isInitialized()).willReturn(true)
         given(sink1.consent).willReturn(false)
+        whenever(sink1.log(any())).then { delayedSingle(5, sink1.id, logSuccessConsumer) }
+        val eventId = "id"
+        val event = TargetEvent.Builder(eventId).sink(sink1Id).build()
+
+        // when
+        trackMeAsync.log(event)
+
+        // then
+        verify(sink1, times(0)).log(any())
+        verifyZeroInteractions(sink3)
+        verifyZeroInteractions(sinkListener)
+
+        // when
+        schedulerRule.testScheduler.advanceTimeBy(3, TimeUnit.SECONDS)
+
+        // then
+        verify(sink1, times(0)).log(any())
+        verifyZeroInteractions(sink3)
+        verifyZeroInteractions(sinkListener)
+
+        // when
+        schedulerRule.testScheduler.advanceTimeBy(3, TimeUnit.SECONDS)
+
+        // then
+        verify(sink1, times(0)).log(eq(event as Event))
+        verify(sink3, times(0)).log(any())
+        verifyZeroInteractions(sinkListener)
+    }
+
+    // Not log if not initialized
+
+    @Test
+    fun shouldNotLogEventIfSinkNotInitialized() {
+        // given
+        given(sink1.isInitialized()).willReturn(false)
+        given(sink1.consent).willReturn(true)
+        whenever(sink1.log(any())).then { single(sink1.id, logSuccessConsumer) }
         val eventId = "id"
         val event = TargetEvent.Builder(eventId).sink(sink1Id).build()
 
@@ -526,18 +641,70 @@ class TrackMeTest {
         // then
         verify(sink1).id
         verify(sink1, times(0)).log(eq(event as Event))
+        verify(sink3, times(0)).log(eq(event as Event))
     }
 
     // Not log if not initialized, in threads
 
-    // Silent crashing in init/start/finish
+    @Test
+    fun shouldNotLogEventAsyncIfSinkNotInitialized() {
+        // given
+        given(sink1.isInitialized()).willReturn(false)
+        given(sink1.consent).willReturn(true)
+        whenever(sink1.log(any())).then { delayedSingle(5, sink1.id, logSuccessConsumer) }
+        val eventId = "id"
+        val event = TargetEvent.Builder(eventId).sink(sink1Id).sink(sink2Id).build()
+
+        // when
+        trackMeAsync.log(event)
+
+        // then
+        verify(sink1, times(0)).log(any())
+        verifyZeroInteractions(sink3)
+        verifyZeroInteractions(sinkListener)
+
+        // when
+        schedulerRule.testScheduler.advanceTimeBy(3, TimeUnit.SECONDS)
+
+        // then
+        verify(sink1, times(0)).log(any())
+        verifyZeroInteractions(sink3)
+        verifyZeroInteractions(sinkListener)
+
+        // when
+        schedulerRule.testScheduler.advanceTimeBy(3, TimeUnit.SECONDS)
+
+        // then
+        verify(sink1, times(0)).log(any())
+        verify(sink3, times(0)).log(any())
+        verifyZeroInteractions(sinkListener)
+    }
+
+    // Silent crashing in init
 
     @Test
     fun shouldNotCrashWhenInitWithException() {
         // given
         given(sink1.isInitialized()).willReturn(true)
         given(sink1.consent).willReturn(true)
-        given(sink1.initialize(any())).willReturn(Single.fromCallable { throw NullPointerException() })
+        given(sink1.initialize(any())).willReturn(singleCrash())
+
+        // when
+        trackMeSync.initialize(context)
+
+        // then
+        verifyZeroInteractions(sink3)
+        verify(sinkListener).onSinkInitError(any())
+    }
+
+    // Silent crashing in init, threads
+
+    @Test
+    fun shouldNotCrashAsyncWhenInitWithException() {
+        // given
+        given(sink1.isInitialized()).willReturn(true)
+        given(sink1.consent).willReturn(true)
+        given(sink1.initialize(any())).willReturn(delayedSingleCrash(3))
 
         // when
         trackMeAsync.initialize(context)
@@ -551,33 +718,104 @@ class TrackMeTest {
 
         // then
         verifyZeroInteractions(sink3)
-        verify(sinkListener).onError(any())
+        verify(sinkListener).onSinkInitError(any())
     }
+
+    // Silent crashing in start
 
     @Test
     fun shouldNotCrashWhenStartWithException() {
         // given
         given(sink1.isInitialized()).willReturn(true)
         given(sink1.consent).willReturn(true)
-        given(sink1.start()).willReturn(Single.fromCallable { throw NullPointerException() })
+        given(sink1.start()).willReturn(singleCrash())
 
         // when
-        trackMeAsync.start()
+        trackMeSync.start()
 
         // then
         verifyZeroInteractions(sink3)
         verify(sinkListener).onError(any())
     }
 
+    // Silent crashing in start, threads
+
+    @Test
+    fun shouldNotCrashAsyncWhenStartWithException() {
+        // given
+        given(sink1.isInitialized()).willReturn(true)
+        given(sink1.consent).willReturn(true)
+        given(sink1.start()).willReturn(delayedSingleCrash(3))
+
+        // when
+        trackMeAsync.start()
+
+        // then
+        verifyZeroInteractions(sink3)
+        verifyZeroInteractions(sinkListener)
+
+        // when
+        schedulerRule.testScheduler.advanceTimeBy(5, TimeUnit.SECONDS)
+
+        // then
+        verifyZeroInteractions(sink3)
+        verify(sinkListener).onError(any())
+    }
+
+    // Silent crashing in finish
+
     @Test
     fun shouldNotCrashWhenFinishWithException() {
         // given
         given(sink1.isInitialized()).willReturn(true)
         given(sink1.consent).willReturn(true)
-        given(sink1.finish()).willReturn(Single.fromCallable { throw NullPointerException() })
+        given(sink1.finish()).willReturn(singleCrash())
+
+        // when
+        trackMeSync.finish()
+
+        // then
+        verifyZeroInteractions(sink3)
+        verify(sinkListener).onError(any())
+    }
+
+    // Silent crashing in finish, threads
+
+    @Test
+    fun shouldNotCrashAsyncWhenFinishWithException() {
+        // given
+        given(sink1.isInitialized()).willReturn(true)
+        given(sink1.consent).willReturn(true)
+        given(sink1.finish()).willReturn(delayedSingleCrash(3))
 
         // when
         trackMeAsync.finish()
+
+        // then
+        verifyZeroInteractions(sink3)
+        verifyZeroInteractions(sinkListener)
+
+        // when
+        schedulerRule.testScheduler.advanceTimeBy(5, TimeUnit.SECONDS)
+
+        // then
+        verifyZeroInteractions(sink3)
+        verify(sinkListener).onError(any())
+    }
+
+    // Silent crashing in logging, threads
+
+    @Test
+    fun shouldNotCrashWhenLogWithException() {
+        // given
+        given(sink1.isInitialized()).willReturn(true)
+        given(sink1.consent).willReturn(true)
+        given(sink1.log(any())).willReturn(singleCrash())
+        val eventId = "id"
+        val event = TargetEvent.Builder(eventId).sink(sink1Id).build()
+
+        // when
+        trackMeSync.log(event)
 
         // then
         verifyZeroInteractions(sink3)
@@ -587,16 +825,23 @@ class TrackMeTest {
     // Silent crashing in logging
 
     @Test
-    fun shouldNotCrashWhenLogWithException() {
+    fun shouldNotCrashAsyncWhenLogWithException() {
         // given
         given(sink1.isInitialized()).willReturn(true)
         given(sink1.consent).willReturn(true)
-        given(sink1.log(any())).willReturn(Single.fromCallable { throw NullPointerException() })
+        given(sink1.log(any())).willReturn(delayedSingleCrash(3))
         val eventId = "id"
         val event = TargetEvent.Builder(eventId).sink(sink1Id).build()
 
         // when
-        trackMeSync.log(event)
+        trackMeAsync.log(event)
+
+        // then
+        verifyZeroInteractions(sink3)
+        verifyZeroInteractions(sinkListener)
+
+        // when
+        schedulerRule.testScheduler.advanceTimeBy(5, TimeUnit.SECONDS)
 
         // then
         verifyZeroInteractions(sink3)
@@ -612,6 +857,9 @@ class TrackMeTest {
         given(sink1.consent).willReturn(false)
         given(sink2.isInitialized()).willReturn(true)
         given(sink2.consent).willReturn(true)
+        whenever(sink1.log(any())).then { single(sink1.id, logSuccessConsumer) }
+        whenever(sink2.log(any())).then { single(sink2.id, logSuccessConsumer) }
+
         val eventId = "id"
         val event = TargetEvent.Builder(eventId).sink(sink1Id).sink(sink2Id).build()
         val trackMe = TrackMe.Builder()
@@ -660,6 +908,10 @@ class TrackMeTest {
     @Test
     fun shouldFinishAllSinks() {
         // given
+        given(sink1.isInitialized()).willReturn(true)
+        given(sink1.consent).willReturn(true)
+        given(sink2.isInitialized()).willReturn(true)
+        given(sink2.consent).willReturn(true)
         whenever(sink1.finish()).then { single(sink1.id, finishSuccessConsumer) }
         whenever(sink2.finish()).then { single(sink2.id, finishSuccessConsumer) }
 
@@ -682,6 +934,10 @@ class TrackMeTest {
     @Test
     fun shouldFinishAsyncAllSinks() {
         // given
+        given(sink1.isInitialized()).willReturn(true)
+        given(sink1.consent).willReturn(true)
+        given(sink2.isInitialized()).willReturn(true)
+        given(sink2.consent).willReturn(true)
         whenever(sink1.finish()).then { delayedSingle(5, sink1.id, finishSuccessConsumer) }
         whenever(sink2.finish()).then { delayedSingle(5, sink2.id, finishSuccessConsumer) }
 
@@ -714,6 +970,12 @@ class TrackMeTest {
     }
 
     // Helpers
+
+    private fun delayedSingleCrash(seconds: Long) =
+        singleCrash().delay(seconds, TimeUnit.SECONDS)
+
+    private fun singleCrash() =
+        Single.fromCallable<Pair<Hashable, Boolean>> { throw NullPointerException() }
 
     private fun delayedSingle(seconds: Long, hashable: Hashable, onSuccess: Consumer<Pair<Hashable, Boolean>>) =
         Single.just(Pair(hashable, true))

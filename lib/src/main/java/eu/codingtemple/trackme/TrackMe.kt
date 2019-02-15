@@ -41,11 +41,28 @@ class TrackMe private constructor(builder: Builder) {
     }
 
     fun log(targetEvent: TargetEvent) {
-        // TODO thread
-        sinks.forEach {
-            if (targetEvent.getTargetSinks().contains(it.id) && it.isInitialized() && consent(it)) {
-                it.log(targetEvent)
+        val observable = sinks
+            .filter { targetEvent.getTargetSinks().contains(it.id) && consent(it) && it.isInitialized() }
+            .map { it.log(targetEvent).toObservable() }
+            .merge()
+            .subscribeOn(scheduler)
+            .observeOn(scheduler)
+
+        if (blocking) {
+            try {
+                observable.blockingForEach { }
+                sinkListener?.onAllSinksInitialized()
+            } catch (e: Exception) {
+                sinkListener?.onError(e)
             }
+        } else {
+            disposable = observable.subscribe({ pair ->
+                // nop
+            }, {
+                sinkListener?.onError(it)
+            }, {
+                // nop
+            })
         }
     }
 
@@ -60,8 +77,12 @@ class TrackMe private constructor(builder: Builder) {
             .observeOn(scheduler)
 
         if (blocking) {
-            observable.blockingForEach { pair -> sinkListener?.onSinkInitialized(pair.first) }
-            sinkListener?.onAllSinksInitialized()
+            try {
+                observable.blockingForEach { pair -> sinkListener?.onSinkInitialized(pair.first) }
+                sinkListener?.onAllSinksInitialized()
+            } catch (e: Exception) {
+                sinkListener?.onSinkInitError(e)
+            }
         } else {
             disposable = observable.subscribe({ pair ->
                 sinkListener?.onSinkInitialized(pair.first)
@@ -82,7 +103,11 @@ class TrackMe private constructor(builder: Builder) {
             .observeOn(scheduler)
 
         if (blocking) {
-            observable.blockingForEach { pair -> sinkListener?.onSinkStarted(pair.first) }
+            try {
+                observable.blockingForEach { pair -> sinkListener?.onSinkStarted(pair.first) }
+            } catch (e: Exception) {
+                sinkListener?.onError(e)
+            }
         } else {
             disposable = observable.subscribe({ pair ->
                 sinkListener?.onSinkStarted(pair.first)
@@ -146,13 +171,18 @@ class TrackMe private constructor(builder: Builder) {
 
     fun finish() {
         val observable = sinks
+            .filter { it.consent && it.isInitialized() }
             .map { it.finish().toObservable() }
             .merge()
             .subscribeOn(scheduler)
             .observeOn(scheduler)
 
         if (blocking) {
-            observable.blockingForEach { pair -> sinkListener?.onSinkFinished(pair.first) }
+            try {
+                observable.blockingForEach { pair -> sinkListener?.onSinkFinished(pair.first) }
+            } catch (e: Exception) {
+                sinkListener?.onError(e)
+            }
         } else {
             disposable = observable.subscribe({ pair ->
                 sinkListener?.onSinkFinished(pair.first)
