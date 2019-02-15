@@ -1,5 +1,5 @@
 # TrackMe
-TrackMe allows you to manage all your tracking services
+TrackMe allows you to manage all your tracking services. Nowadays we use different tools for gathering data about crashes, ui experience, incomes etc. Each and every tool has to be managed separately and in order to send events to multiple tools we need to either add couple of lines in desired place or, like in most cases, we create some uber singleton for managing all these tools and sending events. TrackMe is a library that will help you manage your tracking tools.
 
 **Edit a file, create a new file, and clone from Bitbucket in under 2 minutes**
 
