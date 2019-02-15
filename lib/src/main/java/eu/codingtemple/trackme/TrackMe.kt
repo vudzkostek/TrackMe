@@ -6,7 +6,6 @@ import eu.codingtemple.trackme.sink.Hashable
 import eu.codingtemple.trackme.sink.Sink
 import io.reactivex.Scheduler
 import io.reactivex.disposables.Disposable
-import io.reactivex.functions.Consumer
 import io.reactivex.rxkotlin.merge
 import io.reactivex.schedulers.Schedulers
 import java.util.*
@@ -52,7 +51,7 @@ class TrackMe private constructor(builder: Builder) {
                 sinkListener?.onError(e)
             }
         } else {
-            disposable = observable.subscribe({ pair ->
+            disposable = observable.subscribe({
                 // nop
             }, {
                 sinkListener?.onError(it)
